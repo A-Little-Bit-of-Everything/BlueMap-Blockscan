@@ -23,18 +23,16 @@ public class BlockPropertiesExtractor {
 
         JsonObject blockProps = new JsonObject();
 
-        boolean occluding = defaultState.canOcclude();
-        boolean solid = defaultState.isSolid();
         boolean hasWaterlogged = defaultState.hasProperty(BlockStateProperties.WATERLOGGED);
         boolean randomOffset = defaultState.hasOffsetFunction();
 
         boolean isLeaves = defaultState.is(BlockTags.LEAVES) || block instanceof LeavesBlock;
         boolean isGlass = block instanceof TransparentBlock || block instanceof StainedGlassBlock || defaultState.is(Tags.Blocks.GLASS_BLOCKS);
 
-        blockProps.addProperty("occluding", occluding);
-        blockProps.addProperty("culling", solid);
-
-        if (isGlass || isLeaves) {
+        if (isGlass) {
+            blockProps.addProperty("occluding", false);
+            blockProps.addProperty("cullingIdentical", true);
+        } else if (isLeaves) {
             blockProps.addProperty("cullingIdentical", true);
         }
 
@@ -46,12 +44,10 @@ public class BlockPropertiesExtractor {
             blockProps.addProperty("randomOffset", true);
         }
 
-        // Note: BlueMap's BlockPropertiesConfig parser only accepts culling, occluding,
-        // alwaysWaterlogged, randomOffset, and cullingIdentical. Any unknown key like "light"
-        // causes an IllegalStateException and discards the entire namespace configuration.
-
-        JsonObject map = namespacePropertyMaps.computeIfAbsent(namespace, k -> new JsonObject());
-        map.add(id.toString(), blockProps);
+        if (!blockProps.isEmpty()) {
+            JsonObject map = namespacePropertyMaps.computeIfAbsent(namespace, k -> new JsonObject());
+            map.add(id.toString(), blockProps);
+        }
     }
 
     public Map<String, JsonObject> getNamespacePropertyMaps() {
