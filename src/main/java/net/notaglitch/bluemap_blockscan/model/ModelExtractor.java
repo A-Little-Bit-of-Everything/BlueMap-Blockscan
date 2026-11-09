@@ -106,6 +106,18 @@ public class ModelExtractor {
                                 builder.with(prop, Blocks.OAK_PLANKS.defaultBlockState());
                                 found = true;
                             }
+                        } else if (name.equalsIgnoreCase("MATERIALS_PROPERTY") || name.equalsIgnoreCase("MATERIALS")) {
+                            field.setAccessible(true);
+                            @SuppressWarnings("unchecked")
+                            ModelProperty<java.util.Map<String, BlockState>> prop = (ModelProperty<java.util.Map<String, BlockState>>) field.get(null);
+                            if (prop != null) {
+                                java.util.Map<String, BlockState> dummy = new java.util.HashMap<>();
+                                for (Direction dir : Direction.values()) {
+                                    dummy.put(dir.getName(), Blocks.OAK_PLANKS.defaultBlockState());
+                                }
+                                builder.with(prop, dummy);
+                                found = true;
+                            }
                         }
                     }
                 }
