@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.notaglitch.bluemap_blockscan.model.*;
 import net.notaglitch.bluemap_blockscan.pack.ResourcePackWriter;
+import net.notaglitch.bluemap_blockscan.properties.BlockColorExtractor;
 import net.notaglitch.bluemap_blockscan.properties.BlockPropertiesExtractor;
 import net.notaglitch.bluemap_blockscan.texture.TextureExtractor;
 import org.slf4j.Logger;
@@ -103,6 +104,7 @@ public class BlockScanner {
 
             try (ResourcePackWriter packWriter = new ResourcePackWriter(zipPath, unpackedDir, !options.isClean(), namespacesToOverwrite)) {
                 BlockPropertiesExtractor propertiesExtractor = new BlockPropertiesExtractor();
+                BlockColorExtractor colorExtractor = new BlockColorExtractor();
                 TextureExtractor textureExtractor = new TextureExtractor();
 
                 List<Block> blocksToScan = new ArrayList<>();
@@ -137,6 +139,7 @@ public class BlockScanner {
                     Map<String, String> contentToModelLoc = new HashMap<>();
                     Map<String, String> variantToModelLoc = new LinkedHashMap<>();
                     int uniqueBlockModels = 0;
+                    boolean blockHasTint = false;
 
                     for (int stateIndex = 0; stateIndex < states.size(); stateIndex++) {
                         BlockState state = states.get(stateIndex);
@@ -145,6 +148,13 @@ public class BlockScanner {
                         List<ExtractedQuad> quads = ModelExtractor.extractQuadsForState(state);
                         if (quads.isEmpty()) {
                             continue;
+                        }
+
+                        for (ExtractedQuad quad : quads) {
+                            if (quad.tintIndex >= 0) {
+                                blockHasTint = true;
+                                break;
+                            }
                         }
 
                         // Dump textures if explicitly requested
@@ -200,6 +210,9 @@ public class BlockScanner {
                         packWriter.putJson("assets/" + namespace + "/blockstates/" + blockPath + ".json", stateJson);
                     }
 
+                    // 3. Biome / Color mapping
+                    colorExtractor.processBlock(block, blockHasTint);
+
                     scannedBlocks++;
                     if (scannedBlocks % 500 == 0 || scannedBlocks == totalBlocks) {
                         int percent = (int) ((scannedBlocks / (float) Math.max(1, totalBlocks)) * 100);
@@ -214,6 +227,15 @@ public class BlockScanner {
                         String ns = entry.getKey();
                         JsonObject props = entry.getValue();
                         packWriter.putJson("assets/" + ns + "/blockProperties.json", props);
+                    }
+                }
+
+                // Write blockColors.json for each scanned namespace
+                for (Map.Entry<String, JsonObject> entry : colorExtractor.getNamespaceColorMaps().entrySet()) {
+                    String ns = entry.getKey();
+                    JsonObject colors = entry.getValue();
+                    if (!colors.entrySet().isEmpty()) {
+                        packWriter.putJson("assets/" + ns + "/blockColors.json", colors);
                     }
                 }
 

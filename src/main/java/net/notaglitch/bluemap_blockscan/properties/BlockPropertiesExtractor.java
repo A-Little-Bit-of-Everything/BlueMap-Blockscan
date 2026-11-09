@@ -46,10 +46,9 @@ public class BlockPropertiesExtractor {
             blockProps.addProperty("randomOffset", true);
         }
 
-        int lightEmission = defaultState.getLightEmission();
-        if (lightEmission > 0) {
-            blockProps.addProperty("light", lightEmission);
-        }
+        // Note: BlueMap's BlockPropertiesConfig parser only accepts culling, occluding,
+        // alwaysWaterlogged, randomOffset, and cullingIdentical. Any unknown key like "light"
+        // causes an IllegalStateException and discards the entire namespace configuration.
 
         JsonObject map = namespacePropertyMaps.computeIfAbsent(namespace, k -> new JsonObject());
         map.add(id.toString(), blockProps);
