@@ -13,13 +13,15 @@ public class ExtractedQuad {
     public final float[] v = new float[4];
     public final TextureAtlasSprite sprite;
     public final Direction direction;
+    public final Direction cullDirection; // null if unculled!
     public final int tintIndex;
     public final ResourceLocation spriteLocation;
     public final boolean isShade;
 
-    public ExtractedQuad(BakedQuad quad) {
+    public ExtractedQuad(BakedQuad quad, Direction cullDirection) {
         this.sprite = quad.getSprite();
         this.direction = quad.getDirection();
+        this.cullDirection = cullDirection;
         this.tintIndex = quad.getTintIndex();
         this.isShade = quad.isShade();
 
@@ -39,6 +41,18 @@ public class ExtractedQuad {
         float uSpan = Math.abs(u1 - u0) > 1e-6f ? (u1 - u0) : 1.0f;
         float vSpan = Math.abs(v1 - v0) > 1e-6f ? (v1 - v0) : 1.0f;
 
+        float hAspectRatio = 1.0f;
+        if (sprite != null && sprite.contents() != null) {
+            int w = sprite.contents().width();
+            int h = sprite.contents().height();
+            if (h > 0 && w > h) {
+                hAspectRatio = (float) w / (float) h;
+            }
+        }
+
+        float minRawU = 16.0f;
+        float maxRawU = 0.0f;
+
         // In 1.21.1, DefaultVertexFormat.BLOCK has 8 ints per vertex (32 ints total)
         for (int i = 0; i < 4; i++) {
             int offset = i * 8;
@@ -52,6 +66,19 @@ public class ExtractedQuad {
             // Convert atlas UV back to sprite relative [0..16]
             u[i] = Math.max(0.0f, Math.min(16.0f, (atlasU - u0) / uSpan * 16.0f));
             v[i] = Math.max(0.0f, Math.min(16.0f, (atlasV - v0) / vSpan * 16.0f));
+
+            if (u[i] < minRawU) minRawU = u[i];
+            if (u[i] > maxRawU) maxRawU = u[i];
+        }
+
+        // If this texture is a horizontal connected-texture sheet (e.g. Fusion/Rechiseled width > height),
+        // and the quad is mapped across the entire sheet (rawSpan > 14), scale U down to map only
+        // the base square tile (16.0 / hAspectRatio) so BlueMap renders a clean square tile
+        // instead of compressing all connected tiles into vertical pinstripes.
+        if (hAspectRatio > 1.0f && (maxRawU - minRawU) > 14.0f) {
+            for (int i = 0; i < 4; i++) {
+                u[i] = minRawU + (u[i] - minRawU) / hAspectRatio;
+            }
         }
     }
 
