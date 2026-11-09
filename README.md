@@ -41,6 +41,10 @@ In vanilla Minecraft, **BlueMap** reads static JSON models and textures to gener
   - Updates are staged in a `.tmp` file and atomically moved into place upon completion—your resource pack is never corrupted if interrupted.
 - **Automated `blockProperties.json` Generation:**
   - Extracts face occlusion (`canOcclude()`), solid culling (`isSolid()`), identical neighbor culling for glass and leaves (`cullingIdentical`), waterlogged flags (`alwaysWaterlogged`), offset functions (`randomOffset`), and light emission.
+- **Automated `blockColors.json` & Biome Tinting Extraction:**
+  - Automatically identifies modded leaves, grass, crops, vines, and water blocks, exporting `@foliage`, `@grass`, and `@water` calculator mappings so custom blocks render with authentic biome temperature and rainfall foliage/grass color modifiers on BlueMap rather than raw grayscale.
+- **Dynamic ModelData & Multi-State Model Support (Copycats+):**
+  - Synthesizes fallback `ModelData` (`MATERIAL_PROPERTY` and `MATERIALS_PROPERTY`) during block scanning so code-baked multi-state blocks (such as Copycats+ boards, half-panels, and folding doors) properly emit their mesh quads rather than returning empty models.
 - **Automated Model Deduplication & Blockstate Compression:**
   - Blocks with dozens or hundreds of state permutations (e.g. pipes, cables, facing directions) automatically share identical model geometry files.
   - Blocks with identical shapes across all states compress into a single wildcard variant (`""`), eliminating hundreds of thousands of redundant files and cutting pack size by over 98%.
