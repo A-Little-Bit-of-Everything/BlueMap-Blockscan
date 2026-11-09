@@ -79,7 +79,7 @@ public class BlockScanner {
                 }
 
                 if (newMods.isEmpty()) {
-                    sendFeedback(Component.literal("✔ All " + allLoadedNamespaces.size() + " loaded mods are already present in the BlueMap pack!")
+                    sendFeedback(Component.literal("All " + allLoadedNamespaces.size() + " loaded mods are already present in the BlueMap pack!")
                             .withStyle(ChatFormatting.GREEN));
                     sendFeedback(Component.literal("No new mods detected. (Use '/bluemap_blockscan scan all --clean' to force a full re-scan).")
                             .withStyle(ChatFormatting.GRAY));
@@ -131,10 +131,12 @@ public class BlockScanner {
                         propertiesExtractor.processBlock(block);
                     }
 
-                    // 2. States and Models
+                    // 2. States and Models with content deduplication
                     List<BlockState> states = block.getStateDefinition().getPossibleStates();
                     BlockStateBuilder blockStateBuilder = new BlockStateBuilder();
-                    boolean hasAnyModels = false;
+                    Map<String, String> contentToModelLoc = new HashMap<>();
+                    Map<String, String> variantToModelLoc = new LinkedHashMap<>();
+                    int uniqueBlockModels = 0;
 
                     for (int stateIndex = 0; stateIndex < states.size(); stateIndex++) {
                         BlockState state = states.get(stateIndex);
@@ -145,7 +147,7 @@ public class BlockScanner {
                             continue;
                         }
 
-                        // Dump textures if requested
+                        // Dump textures if explicitly requested
                         if (options.isDumpTextures()) {
                             for (ExtractedQuad quad : quads) {
                                 if (quad.sprite != null) {
@@ -154,35 +156,52 @@ public class BlockScanner {
                             }
                         }
 
-                        // Export model
+                        // Export model with deduplication
                         if (options.isExportModels()) {
                             String stateVariant = BlockStateBuilder.serializeStateProperties(state);
-                            String modelName = states.size() == 1 ? blockPath : (blockPath + "_state" + stateIndex);
-                            String modelResourceLocation = namespace + ":block/" + modelName;
-
                             JsonObject modelJson = JsonModelBuilder.buildModelJson(quads);
-                            packWriter.putJson("assets/" + namespace + "/models/block/" + modelName + ".json", modelJson);
+                            String modelKey = modelJson.toString();
 
-                            // If any quad is non-axis aligned, also produce an OBJ file for BlueMap OBJ loader
-                            boolean hasNonAxisAligned = quads.stream().anyMatch(q -> !q.isPlanarAxisAligned());
-                            if (hasNonAxisAligned) {
-                                String objContent = ObjModelBuilder.buildObj(modelName, quads);
-                                packWriter.putString("assets/" + namespace + "/models/block/" + modelName + ".obj", objContent);
+                            String modelResourceLocation = contentToModelLoc.get(modelKey);
+                            if (modelResourceLocation == null) {
+                                String modelName = (uniqueBlockModels == 0 && states.size() == 1)
+                                        ? blockPath
+                                        : (blockPath + (uniqueBlockModels == 0 ? "" : "_m" + uniqueBlockModels));
+                                modelResourceLocation = namespace + ":block/" + modelName;
+                                contentToModelLoc.put(modelKey, modelResourceLocation);
+
+                                packWriter.putJson("assets/" + namespace + "/models/block/" + modelName + ".json", modelJson);
+
+                                boolean hasNonAxisAligned = quads.stream().anyMatch(q -> !q.isPlanarAxisAligned());
+                                if (hasNonAxisAligned) {
+                                    String objContent = ObjModelBuilder.buildObj(modelName, quads);
+                                    packWriter.putString("assets/" + namespace + "/models/block/" + modelName + ".obj", objContent);
+                                }
+
+                                uniqueBlockModels++;
+                                totalModelsExported++;
                             }
 
-                            blockStateBuilder.addVariant(stateVariant, modelResourceLocation);
-                            hasAnyModels = true;
-                            totalModelsExported++;
+                            variantToModelLoc.put(stateVariant, modelResourceLocation);
                         }
                     }
 
-                    if (hasAnyModels && options.isExportModels()) {
+                    if (!variantToModelLoc.isEmpty() && options.isExportModels()) {
+                        // If all states share the exact same model, compress into a single wildcard variant ""
+                        if (uniqueBlockModels == 1) {
+                            String singleModel = contentToModelLoc.values().iterator().next();
+                            blockStateBuilder.addVariant("", singleModel);
+                        } else {
+                            for (Map.Entry<String, String> entry : variantToModelLoc.entrySet()) {
+                                blockStateBuilder.addVariant(entry.getKey(), entry.getValue());
+                            }
+                        }
                         JsonObject stateJson = blockStateBuilder.buildBlockStateJson();
                         packWriter.putJson("assets/" + namespace + "/blockstates/" + blockPath + ".json", stateJson);
                     }
 
                     scannedBlocks++;
-                    if (scannedBlocks % 250 == 0 || scannedBlocks == totalBlocks) {
+                    if (scannedBlocks % 500 == 0 || scannedBlocks == totalBlocks) {
                         int percent = (int) ((scannedBlocks / (float) Math.max(1, totalBlocks)) * 100);
                         sendFeedback(Component.literal(String.format("Progress: %d/%d blocks (%d%%)...", scannedBlocks, totalBlocks, percent))
                                 .withStyle(ChatFormatting.YELLOW));
@@ -201,9 +220,9 @@ public class BlockScanner {
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
                 Set<String> finalPackNamespaces = ResourcePackWriter.getExistingNamespaces(zipPath);
 
-                sendFeedback(Component.literal("§a✔ BlueMap Blockscan complete in " + elapsed + "s!"));
-                sendFeedback(Component.literal(String.format("§7Exported: %d blocks, %d states, %d models, %d new textures into:",
-                        scannedBlocks, totalStatesScanned, totalModelsExported, textureExtractor.getExportedTextureCount())));
+                sendFeedback(Component.literal("BlueMap Blockscan complete in " + elapsed + "s!").withStyle(ChatFormatting.GREEN));
+                sendFeedback(Component.literal(String.format("Exported: %d blocks, %d states, %d unique models into %d files.",
+                        scannedBlocks, totalStatesScanned, totalModelsExported, packWriter.getFileCount())).withStyle(ChatFormatting.GRAY));
 
                 String absPath = zipPath.toAbsolutePath().toString();
                 Path parentDir = zipPath.toAbsolutePath().getParent();
@@ -254,7 +273,7 @@ public class BlockScanner {
 
         } catch (Exception e) {
             LOGGER.error("Error during BlueMap Blockscan", e);
-            sendFeedback(Component.literal("§cError during scan: " + e.getMessage()));
+            sendFeedback(Component.literal("Error during scan: " + e.getMessage()).withStyle(ChatFormatting.RED));
         } finally {
             SCANNING.set(false);
         }
@@ -271,13 +290,15 @@ public class BlockScanner {
         Set<String> unscanned = new TreeSet<>(allLoaded);
         unscanned.removeAll(inPack);
 
-        sendFeedback(Component.literal("§6=== BlueMap Blockscan Status ==="));
-        sendFeedback(Component.literal("§aMods in current pack (" + inPack.size() + "): §7" + (inPack.isEmpty() ? "None" : String.join(", ", inPack))));
+        sendFeedback(Component.literal("=== BlueMap Blockscan Status ===").withStyle(ChatFormatting.GOLD));
+        sendFeedback(Component.literal("Mods in current pack (" + inPack.size() + "): ").withStyle(ChatFormatting.GREEN)
+                .append(Component.literal(inPack.isEmpty() ? "None" : String.join(", ", inPack)).withStyle(ChatFormatting.GRAY)));
         if (unscanned.isEmpty()) {
-            sendFeedback(Component.literal("§a✔ All installed mods are scanned!"));
+            sendFeedback(Component.literal("All installed mods are scanned!").withStyle(ChatFormatting.GREEN));
         } else {
-            sendFeedback(Component.literal("§eUnscanned new mods (" + unscanned.size() + "): §c" + String.join(", ", unscanned)));
-            sendFeedback(Component.literal("§7Tip: Run §e/bluemap_blockscan update§7 to scan only the missing mods."));
+            sendFeedback(Component.literal("Unscanned new mods (" + unscanned.size() + "): ").withStyle(ChatFormatting.YELLOW)
+                    .append(Component.literal(String.join(", ", unscanned)).withStyle(ChatFormatting.RED)));
+            sendFeedback(Component.literal("Tip: Run /bluemap_blockscan update to scan only the missing mods.").withStyle(ChatFormatting.GRAY));
         }
     }
 

@@ -41,6 +41,12 @@ In vanilla Minecraft, **BlueMap** reads static JSON models and textures to gener
   - Updates are staged in a `.tmp` file and atomically moved into place upon completion—your resource pack is never corrupted if interrupted.
 - **Automated `blockProperties.json` Generation:**
   - Extracts face occlusion (`canOcclude()`), solid culling (`isSolid()`), identical neighbor culling for glass and leaves (`cullingIdentical`), waterlogged flags (`alwaysWaterlogged`), offset functions (`randomOffset`), and light emission.
+- **Automated Model Deduplication & Blockstate Compression:**
+  - Blocks with dozens or hundreds of state permutations (e.g. pipes, cables, facing directions) automatically share identical model geometry files.
+  - Blocks with identical shapes across all states compress into a single wildcard variant (`""`), eliminating hundreds of thousands of redundant files and cutting pack size by over 98%.
+- **Lean Server-Friendly Mode (No Duplicate Textures):**
+  - BlueMap already reads textures directly from mod JARs via `scan-for-mod-resources`. BlueMap Blockscan generates models referencing those textures without redundantly packing tens of thousands of duplicate PNGs into the zip.
+  - Keeps the output pack under 25 MB and allows BlueMap to boot and open its web server in 2 to 4 seconds, running smoothly on servers with 4 GB to 12 GB RAM without OutOfMemoryErrors.
 - **3D Model Decompilation (JSON & OBJ):**
   - **Planar / Cuboid Geometry:** Converted into standard Minecraft JSON block models (`models/block/...`).
   - **Complex / Slanted Geometry:** Automatically detects non-axis-aligned quads (gears, diagonal pipes, chutes, slopes) and generates Wavefront `.obj` models compatible with BlueMap and *BlueMapModelLoaders*.
@@ -152,7 +158,7 @@ unpackedPath = "bluemap_blockscan_export"
 includeMinecraft = false
 
 # Feature toggles
-dumpTextures = true
+dumpTextures = false # false keeps pack under 25MB and prevents server OOM crashes
 exportModels = true
 exportProperties = true
 

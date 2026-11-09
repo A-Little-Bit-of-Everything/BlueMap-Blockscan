@@ -32,7 +32,7 @@ public class BlockscanConfig {
 
     public static final ModConfigSpec.BooleanValue DUMP_TEXTURES = BUILDER
             .comment("Whether to extract and save PNG textures from the game texture atlas.")
-            .define("dumpTextures", true);
+            .define("dumpTextures", false);
 
     public static final ModConfigSpec.BooleanValue EXPORT_MODELS = BUILDER
             .comment("Whether to reconstruct and export 3D JSON/OBJ block models.")
@@ -53,7 +53,7 @@ public class BlockscanConfig {
     public static boolean exportUnpacked = false;
     public static String unpackedPath = "bluemap_blockscan_export";
     public static boolean includeMinecraft = false;
-    public static boolean dumpTextures = true;
+    public static boolean dumpTextures = false;
     public static boolean exportModels = true;
     public static boolean exportProperties = true;
     public static List<? extends String> excludedNamespaces = List.of("c", "neoforge", "forge");
