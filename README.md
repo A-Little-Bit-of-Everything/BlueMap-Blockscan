@@ -98,6 +98,16 @@ All commands are client-side (`RegisterClientCommandsEvent`) and run directly in
    /bluemap render <map-name>
    ```
 
+### Important: BlueMap Web Server Startup Delay
+
+In large modpacks (hundreds of mods), `bluemap-blockscan.zip` can exceed 1 GB and contain tens of thousands of textures.
+
+During server startup or when running `/bluemap reload`, **BlueMap indexes and validates all textures and models before binding its HTTP web server port** (default port `8989`).
+
+- **Delayed Port Binding:** BlueMap will actively index textures in the background for 1 to 2 minutes on startup (`Loading textures from: config\bluemap\packs\bluemap-blockscan.zip ...`).
+- **Temporary 502 Bad Gateway:** If you access your map through a reverse proxy or server manager (e.g. AMP, Nginx, Caddy, Cloudflare), you will receive a **502 Bad Gateway** or connection timeout while BlueMap is still indexing.
+- **What to do:** This is expected behavior. Check your server console or `debug.log` to monitor texture loading. As soon as BlueMap completes the resource stage, port 8989 will bind and the web interface will immediately come online.
+
 ---
 
 ## Workflow: Adding New Mods Later
