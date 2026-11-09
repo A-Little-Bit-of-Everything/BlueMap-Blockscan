@@ -1,11 +1,17 @@
 package net.notaglitch.bluemap_blockscan.model;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class ExtractedQuad {
+    private static final Map<ResourceLocation, Float> HORIZONTAL_ASPECT_RATIOS = new ConcurrentHashMap<>();
+
     public final float[] x = new float[4];
     public final float[] y = new float[4];
     public final float[] z = new float[4];
@@ -41,18 +47,6 @@ public class ExtractedQuad {
         float uSpan = Math.abs(u1 - u0) > 1e-6f ? (u1 - u0) : 1.0f;
         float vSpan = Math.abs(v1 - v0) > 1e-6f ? (v1 - v0) : 1.0f;
 
-        float hAspectRatio = 1.0f;
-        if (sprite != null && sprite.contents() != null) {
-            int w = sprite.contents().width();
-            int h = sprite.contents().height();
-            if (h > 0 && w > h) {
-                hAspectRatio = (float) w / (float) h;
-            }
-        }
-
-        float minRawU = 16.0f;
-        float maxRawU = 0.0f;
-
         // In 1.21.1, DefaultVertexFormat.BLOCK has 8 ints per vertex (32 ints total)
         for (int i = 0; i < 4; i++) {
             int offset = i * 8;
@@ -66,20 +60,45 @@ public class ExtractedQuad {
             // Convert atlas UV back to sprite relative [0..16]
             u[i] = Math.max(0.0f, Math.min(16.0f, (atlasU - u0) / uSpan * 16.0f));
             v[i] = Math.max(0.0f, Math.min(16.0f, (atlasV - v0) / vSpan * 16.0f));
-
-            if (u[i] < minRawU) minRawU = u[i];
-            if (u[i] > maxRawU) maxRawU = u[i];
         }
 
-        // If this texture is a horizontal connected-texture sheet (e.g. Fusion/Rechiseled width > height),
-        // and the quad is mapped across the entire sheet (rawSpan > 14), scale U down to map only
-        // the base square tile (16.0 / hAspectRatio) so BlueMap renders a clean square tile
-        // instead of compressing all connected tiles into vertical pinstripes.
-        if (hAspectRatio > 1.0f && (maxRawU - minRawU) > 14.0f) {
+        // Check the actual PNG dimensions in the mod JAR via ResourceManager.
+        // CTM mods like Fusion store connected textures as multi-tile horizontal sheets (e.g. 64x16 or 80x16).
+        // Since BlueMap loads the raw wide PNG from the mod JAR, we must scale U by the horizontal aspect ratio
+        // (e.g. U / 4.0 or U / 5.0) so BlueMap samples only the base standalone tile instead of compressing all
+        // connected frames into vertical pinstripes.
+        float hAspectRatio = getTextureHorizontalAspect(this.spriteLocation);
+        if (hAspectRatio > 1.0f) {
             for (int i = 0; i < 4; i++) {
-                u[i] = minRawU + (u[i] - minRawU) / hAspectRatio;
+                u[i] = u[i] / hAspectRatio;
             }
         }
+    }
+
+    public static float getTextureHorizontalAspect(ResourceLocation spriteLocation) {
+        if (spriteLocation == null) return 1.0f;
+        return HORIZONTAL_ASPECT_RATIOS.computeIfAbsent(spriteLocation, loc -> {
+            try {
+                ResourceLocation fileLoc = ResourceLocation.fromNamespaceAndPath(loc.getNamespace(), "textures/" + loc.getPath() + ".png");
+                var resourceOpt = Minecraft.getInstance().getResourceManager().getResource(fileLoc);
+                if (resourceOpt.isPresent()) {
+                    try (var is = resourceOpt.get().open()) {
+                        byte[] header = new byte[24];
+                        int read = is.readNBytes(header, 0, 24);
+                        if (read == 24) {
+                            if ((header[0] & 0xFF) == 0x89 && header[1] == 'P' && header[2] == 'N' && header[3] == 'G') {
+                                int width = ((header[16] & 0xFF) << 24) | ((header[17] & 0xFF) << 16) | ((header[18] & 0xFF) << 8) | (header[19] & 0xFF);
+                                int height = ((header[20] & 0xFF) << 24) | ((header[21] & 0xFF) << 16) | ((header[22] & 0xFF) << 8) | (header[23] & 0xFF);
+                                if (height > 0 && width > height) {
+                                    return (float) width / (float) height;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            return 1.0f;
+        });
     }
 
     public boolean isPlanarAxisAligned() {
