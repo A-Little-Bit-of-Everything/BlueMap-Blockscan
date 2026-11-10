@@ -28,6 +28,57 @@ public class ModelExtractor {
         return extractQuadsFromModel(state, model);
     }
 
+    /**
+     * Determines whether a block already has a static, standard vanilla JSON model and blockstate
+     * available in the client's resource manager (e.g. from its mod JAR).
+     *
+     * If true, BlueMap can read this model directly from the mod JAR with full fidelity
+     * (including Blockbench rotations, proper UVs, and native culling).
+     * Extracting/exporting a flattened synthetic box approximation would only degrade it.
+     */
+    public static boolean hasStaticModelAvailable(net.minecraft.world.level.block.Block block) {
+        net.minecraft.resources.ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block);
+        if (id == null) return false;
+
+        String namespace = id.getNamespace();
+        String path = id.getPath();
+
+        // 1. Check if a static blockstate JSON exists in the loaded resource packs / mod JARs
+        net.minecraft.server.packs.resources.ResourceManager rm = Minecraft.getInstance().getResourceManager();
+        net.minecraft.resources.ResourceLocation bsLoc = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(namespace, "blockstates/" + path + ".json");
+        java.util.Optional<net.minecraft.server.packs.resources.Resource> bsRes = rm.getResource(bsLoc);
+        if (bsRes.isEmpty()) {
+            return false;
+        }
+
+        // 2. Check the runtime BakedModel for the block's default state
+        BlockRenderDispatcher dispatcher = Minecraft.getInstance().getBlockRenderer();
+        BakedModel model = dispatcher.getBlockModel(block.defaultBlockState());
+        if (model == null) {
+            return false;
+        }
+
+        // Unwrap any BakedModelWrapper instances
+        BakedModel unwrapped = model;
+        while (unwrapped instanceof net.neoforged.neoforge.client.model.BakedModelWrapper<?> wrapper) {
+            try {
+                java.lang.reflect.Field f = net.neoforged.neoforge.client.model.BakedModelWrapper.class.getDeclaredField("originalModel");
+                f.setAccessible(true);
+                BakedModel next = (BakedModel) f.get(wrapper);
+                if (next == null || next == unwrapped) break;
+                unwrapped = next;
+            } catch (Throwable t) {
+                break;
+            }
+        }
+
+        // If the unwrapped model is a standard vanilla SimpleBakedModel or WeightedBakedModel,
+        // it was parsed from standard Minecraft JSON elements.
+        // Custom loaders (e.g. OBJ loader, dynamic models, Copycats) are NOT SimpleBakedModel.
+        return unwrapped instanceof net.minecraft.client.resources.model.SimpleBakedModel
+                || unwrapped instanceof net.minecraft.client.resources.model.WeightedBakedModel;
+    }
+
     public static List<ExtractedQuad> extractQuadsFromModel(BlockState state, BakedModel model) {
         List<ExtractedQuad> results = new ArrayList<>();
         if (model == null) {

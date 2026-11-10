@@ -120,6 +120,7 @@ public class BlockScanner {
                         .withStyle(ChatFormatting.GRAY));
 
                 int scannedBlocks = 0;
+                int skippedBlocks = 0;
                 int totalStatesScanned = 0;
                 int totalModelsExported = 0;
 
@@ -127,6 +128,12 @@ public class BlockScanner {
                     ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
                     String namespace = id.getNamespace();
                     String blockPath = id.getPath();
+
+                    if (options.isSkipExistingModels() && ModelExtractor.hasStaticModelAvailable(block)) {
+                        skippedBlocks++;
+                        scannedBlocks++;
+                        continue;
+                    }
 
                     // 1. Properties
                     if (options.isExportProperties()) {
@@ -243,8 +250,8 @@ public class BlockScanner {
                 Set<String> finalPackNamespaces = ResourcePackWriter.getExistingNamespaces(zipPath);
 
                 sendFeedback(Component.literal("BlueMap Blockscan complete in " + elapsed + "s!").withStyle(ChatFormatting.GREEN));
-                sendFeedback(Component.literal(String.format("Exported: %d blocks, %d states, %d unique models into %d files.",
-                        scannedBlocks, totalStatesScanned, totalModelsExported, packWriter.getFileCount())).withStyle(ChatFormatting.GRAY));
+                sendFeedback(Component.literal(String.format("Exported: %d blocks (%d skipped with existing models), %d states, %d unique models into %d files.",
+                        scannedBlocks - skippedBlocks, skippedBlocks, totalStatesScanned, totalModelsExported, packWriter.getFileCount())).withStyle(ChatFormatting.GRAY));
 
                 String absPath = zipPath.toAbsolutePath().toString();
                 Path parentDir = zipPath.toAbsolutePath().getParent();

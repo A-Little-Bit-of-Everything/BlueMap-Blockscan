@@ -17,6 +17,7 @@ public class ScanOptions {
     private final boolean dumpTextures;
     private final boolean exportModels;
     private final boolean exportProperties;
+    private final boolean skipExistingModels;
     private final boolean includeMinecraft;
     private final Set<String> excludedNamespaces;
     private final Path zipOutputPath;
@@ -29,6 +30,7 @@ public class ScanOptions {
                        Boolean dumpTextures,
                        Boolean exportModels,
                        Boolean exportProperties,
+                       Boolean skipExistingModels,
                        String customZipPath) {
         if (targetNamespaces != null && !targetNamespaces.isEmpty()) {
             Set<String> lower = new HashSet<>();
@@ -48,6 +50,7 @@ public class ScanOptions {
         this.dumpTextures = dumpTextures != null ? dumpTextures : BlockscanConfig.dumpTextures;
         this.exportModels = exportModels != null ? exportModels : BlockscanConfig.exportModels;
         this.exportProperties = exportProperties != null ? exportProperties : BlockscanConfig.exportProperties;
+        this.skipExistingModels = skipExistingModels != null ? skipExistingModels : BlockscanConfig.skipExistingModels;
         this.includeMinecraft = BlockscanConfig.includeMinecraft;
         this.excludedNamespaces = new HashSet<>(BlockscanConfig.excludedNamespaces);
 
@@ -57,19 +60,19 @@ public class ScanOptions {
     }
 
     public static ScanOptions createDefault() {
-        return new ScanOptions(null, false, BlockscanConfig.autoIncremental, false, null, null, null, null);
+        return new ScanOptions(null, false, BlockscanConfig.autoIncremental, false, null, null, null, null, null);
     }
 
     public static ScanOptions createWithUpload() {
-        return new ScanOptions(null, false, BlockscanConfig.autoIncremental, true, null, null, null, null);
+        return new ScanOptions(null, false, BlockscanConfig.autoIncremental, true, null, null, null, null, null);
     }
 
     public static ScanOptions createForSingleMod(String modid, boolean autoUpload) {
-        return new ScanOptions(Collections.singleton(modid), false, true, autoUpload, null, null, null, null);
+        return new ScanOptions(Collections.singleton(modid), false, true, autoUpload, null, null, null, null, null);
     }
 
     public static ScanOptions createCleanFull(boolean autoUpload) {
-        return new ScanOptions(null, true, false, autoUpload, null, null, null, null);
+        return new ScanOptions(null, true, false, autoUpload, null, null, null, null, null);
     }
 
     public boolean shouldScanBlock(String namespace) {
@@ -109,6 +112,10 @@ public class ScanOptions {
 
     public boolean isExportProperties() {
         return exportProperties;
+    }
+
+    public boolean isSkipExistingModels() {
+        return skipExistingModels;
     }
 
     public Path getZipOutputPath() {

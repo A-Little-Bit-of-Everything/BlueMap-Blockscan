@@ -46,6 +46,12 @@ public class BlockscanConfig {
             .comment("List of mod namespaces to exclude from scanning.")
             .defineListAllowEmpty("excludedNamespaces", List.of("c", "neoforge", "forge"), obj -> obj instanceof String);
 
+    public static final ModConfigSpec.BooleanValue SKIP_EXISTING_MODELS = BUILDER
+            .comment("When true, blocks that already have standard static JSON blockstates and models in their mod JARs",
+                     "will be skipped, preventing blockscan from overwriting authentic Blockbench/vanilla models with simplified geometry.",
+                     "Blockscan will only extract blocks with custom/dynamic models (e.g. Create copycats, casings, procedural models).")
+            .define("skipExistingModels", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     public static String outputPackPath = "config/bluemap/packs/bluemap-blockscan.zip";
@@ -56,6 +62,7 @@ public class BlockscanConfig {
     public static boolean dumpTextures = false;
     public static boolean exportModels = true;
     public static boolean exportProperties = true;
+    public static boolean skipExistingModels = true;
     public static List<? extends String> excludedNamespaces = List.of("c", "neoforge", "forge");
 
     public static void onLoad(final ModConfigEvent event) {
@@ -67,6 +74,7 @@ public class BlockscanConfig {
         dumpTextures = DUMP_TEXTURES.get();
         exportModels = EXPORT_MODELS.get();
         exportProperties = EXPORT_PROPERTIES.get();
+        skipExistingModels = SKIP_EXISTING_MODELS.get();
         excludedNamespaces = EXCLUDED_NAMESPACES.get();
     }
 }

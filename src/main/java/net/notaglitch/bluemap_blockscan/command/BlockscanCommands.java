@@ -48,7 +48,7 @@ public class BlockscanCommands {
                         .executes(ctx -> {
                             String modid = StringArgumentType.getString(ctx, "modid");
                             if (modid.equalsIgnoreCase("all")) {
-                                BlockScanner.startScan(new ScanOptions(null, false, false, false, null, null, null, null));
+                                BlockScanner.startScan(new ScanOptions(null, false, false, false, null, null, null, null, null));
                             } else {
                                 BlockScanner.startScan(ScanOptions.createForSingleMod(modid, false));
                             }
@@ -58,7 +58,7 @@ public class BlockscanCommands {
                             .executes(ctx -> {
                                 String modid = StringArgumentType.getString(ctx, "modid");
                                 if (modid.equalsIgnoreCase("all")) {
-                                    BlockScanner.startScan(new ScanOptions(null, false, false, true, null, null, null, null));
+                                    BlockScanner.startScan(new ScanOptions(null, false, false, true, null, null, null, null, null));
                                 } else {
                                     BlockScanner.startScan(ScanOptions.createForSingleMod(modid, true));
                                 }
